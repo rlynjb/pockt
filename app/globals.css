@@ -372,4 +372,53 @@ select:focus-visible {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .gridScroller {
+    overflow-x: hidden;
+  }
+
+  .habitGrid {
+    min-width: 0;
+  }
+
+  .habitGrid th,
+  .habitGrid td {
+    padding: 5px 2px;
+  }
+
+  .habitGrid thead th {
+    font-size: 0.75rem;
+  }
+
+  .habitGrid thead th em {
+    font-size: 0.625rem;
+  }
+
+  .habitColumn,
+  .habitName {
+    width: clamp(112px, 33vw, 132px);
+  }
+
+  .habitNameContent {
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .dragHandle {
+    width: 14px;
+    min-width: 14px;
+    height: 22px;
+  }
+
+  .textButton {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .completionCell {
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+  }
 }

@@ -49,6 +49,18 @@ test("renders the approved tracker and management flows", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "pockt habits" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: /Sun 16 Today/ })).toBeVisible();
   await expect(page.getByRole("rowheader", { name: "Drink water" })).toBeVisible();
+  const gridMetrics = await page.evaluate(() => {
+    const scroller = document.querySelector(".gridScroller");
+    const table = document.querySelector(".habitGrid");
+    if (!(scroller instanceof HTMLElement) || !(table instanceof HTMLElement)) {
+      throw new Error("Habit grid did not render");
+    }
+    return {
+      scrollerWidth: scroller.getBoundingClientRect().width,
+      tableWidth: table.getBoundingClientRect().width
+    };
+  });
+  expect(gridMetrics.tableWidth).toBeLessThanOrEqual(gridMetrics.scrollerWidth + 1);
 
   await page.getByRole("button", { name: "Add habit" }).click();
   const addDialog = page.getByRole("dialog", { name: "Add habit" });
