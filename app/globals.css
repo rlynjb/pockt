@@ -200,6 +200,74 @@ select:focus-visible {
   background: linear-gradient(90deg, #f5f4f1, #ffffff, #f5f4f1);
 }
 
+.secondaryButton,
+.dangerButton {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.dangerButton {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(31, 31, 31, 0.24);
+}
+
+.dialogPanel {
+  width: min(420px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 16px 48px rgba(31, 31, 31, 0.18);
+}
+
+.dialogHeader,
+.dialogActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dialogHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.habitForm {
+  display: grid;
+  gap: 12px;
+}
+
+.habitForm label {
+  display: grid;
+  gap: 6px;
+}
+
+.habitForm input,
+.habitForm select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+
 @media (max-width: 640px) {
   .appShell {
     padding: 8px;
