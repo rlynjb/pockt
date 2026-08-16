@@ -48,8 +48,12 @@ describe("HabitTracker", () => {
 
     expect(await screen.findByRole("heading", { name: "pockt habits" })).toBeInTheDocument();
     expect(fakeApi.loadWeek).toHaveBeenCalledWith("2026-08-10", "2026-08-16");
-    expect(screen.getByRole("columnheader", { name: /Mon 10/ })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /Sun 16 Today/ })).toBeInTheDocument();
+    const mondayHeader = screen.getByRole("columnheader", { name: /Monday 10/ });
+    const todayHeader = screen.getByRole("columnheader", { name: /Sunday 16 Today/ });
+    expect(within(mondayHeader).getByText("M")).toBeInTheDocument();
+    expect(within(mondayHeader).queryByText("Mon")).not.toBeInTheDocument();
+    expect(within(todayHeader).getByText("S")).toBeInTheDocument();
+    expect(within(todayHeader).queryByText("Sun")).not.toBeInTheDocument();
     expect(screen.getByText("Morning")).toBeInTheDocument();
     expect(screen.getByRole("rowheader", { name: "Drink water" })).toBeInTheDocument();
   });

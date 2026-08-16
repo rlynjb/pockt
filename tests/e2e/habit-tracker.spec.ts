@@ -47,7 +47,10 @@ test("renders the approved tracker and management flows", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "pockt habits" })).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: /Sun 16 Today/ })).toBeVisible();
+  const todayHeader = page.getByRole("columnheader", { name: /Sunday 16 Today/ });
+  await expect(todayHeader).toBeVisible();
+  await expect(todayHeader).toContainText("S");
+  await expect(todayHeader).not.toContainText("Sun");
   await expect(page.getByRole("rowheader", { name: "Drink water" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Drink water", exact: true })).toHaveCSS("font-weight", "400");
   const gridMetrics = await page.evaluate(() => {

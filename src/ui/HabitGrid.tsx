@@ -24,6 +24,11 @@ function longDate(dateOnly: string): string {
   }).format(new Date(year, month - 1, day));
 }
 
+function longWeekday(dateOnly: string): string {
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(new Date(year, month - 1, day));
+}
+
 export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, onEdit, onReorder, reorderSaving }: Props) {
   const [draggedHabit, setDraggedHabit] = useState<{ slot: Slot; id: string } | null>(null);
   const [activeDropTarget, setActiveDropTarget] = useState<string | null>(null);
@@ -71,18 +76,21 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
             <th scope="col" className="habitColumn">
               Habit
             </th>
-            {days.map((day) => (
-              <th
-                key={day.date}
-                scope="col"
-                className={day.isToday ? "todayColumn" : undefined}
-                aria-label={`${day.weekday} ${day.dayOfMonth}${day.isToday ? " Today" : ""}`}
-              >
-                <span>{day.weekday}</span>
-                <strong>{day.dayOfMonth}</strong>
-                {day.isToday ? <em>Today</em> : null}
-              </th>
-            ))}
+            {days.map((day) => {
+              const weekday = longWeekday(day.date);
+              return (
+                <th
+                  key={day.date}
+                  scope="col"
+                  className={day.isToday ? "todayColumn" : undefined}
+                  aria-label={`${weekday} ${day.dayOfMonth}${day.isToday ? " Today" : ""}`}
+                >
+                  <span>{day.weekday.slice(0, 1)}</span>
+                  <strong>{day.dayOfMonth}</strong>
+                  {day.isToday ? <em>Today</em> : null}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
