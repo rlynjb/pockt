@@ -49,6 +49,7 @@ test("renders the approved tracker and management flows", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "pockt habits" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: /Sun 16 Today/ })).toBeVisible();
   await expect(page.getByRole("rowheader", { name: "Drink water" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Drink water", exact: true })).toHaveCSS("font-weight", "400");
   const gridMetrics = await page.evaluate(() => {
     const scroller = document.querySelector(".gridScroller");
     const table = document.querySelector(".habitGrid");

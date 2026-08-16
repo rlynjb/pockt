@@ -122,6 +122,10 @@ select:focus-visible {
   text-align: left;
 }
 
+.habitName .textButton {
+  font-weight: 400;
+}
+
 .habitNameContent {
   display: flex;
   align-items: center;
