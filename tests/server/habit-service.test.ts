@@ -96,4 +96,27 @@ describe("habit service", () => {
     });
     await expect(setCompletion(fake, { habitId: "h1", date: "2026-08-16", completed: true })).rejects.toThrow("Archived habits cannot be completed");
   });
+
+  it("serializes concurrent writes for the same habit and date", async () => {
+    let activeWrites = 0;
+    let maxActiveWrites = 0;
+    const fake = repo({
+      getHabit: vi.fn().mockResolvedValue({ id: "h1", name: "Read", slot: "Evening", status: "Active" }),
+      ensureCompletion: vi.fn().mockImplementation(async () => {
+        activeWrites += 1;
+        maxActiveWrites = Math.max(maxActiveWrites, activeWrites);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        activeWrites -= 1;
+        return null;
+      })
+    });
+
+    await Promise.all([
+      setCompletion(fake, { habitId: "h1", date: "2026-08-16", completed: true }),
+      setCompletion(fake, { habitId: "h1", date: "2026-08-16", completed: true })
+    ]);
+
+    expect(fake.ensureCompletion).toHaveBeenCalledTimes(2);
+    expect(maxActiveWrites).toBe(1);
+  });
 });

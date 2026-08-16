@@ -3,6 +3,27 @@ import { assertDateOnly, buildWeek } from "@/src/domain/week";
 import { ServiceError } from "@/src/server/errors";
 import type { HabitRepository } from "@/src/server/repository";
 
+const completionWriteLocks = new Map<string, Promise<void>>();
+
+async function runWithCompletionLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = completionWriteLocks.get(key) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  const tracked = current.then(
+    () => undefined,
+    () => undefined
+  );
+
+  completionWriteLocks.set(key, tracked);
+
+  try {
+    return await current;
+  } finally {
+    if (completionWriteLocks.get(key) === tracked) {
+      completionWriteLocks.delete(key);
+    }
+  }
+}
+
 export async function getWeek(repo: HabitRepository, startDate: string, todayDate: string) {
   const weekStart = assertDateOnly(startDate);
   const days = buildWeek(weekStart, assertDateOnly(todayDate));
@@ -63,5 +84,7 @@ export async function setCompletion(
   if (habit.status === "Archived") {
     throw new ServiceError("bad_request", "Archived habits cannot be completed", 400);
   }
-  return repo.ensureCompletion({ habitId: input.habitId, date, completed: input.completed });
+  return runWithCompletionLock(`${input.habitId}:${date}`, () =>
+    repo.ensureCompletion({ habitId: input.habitId, date, completed: input.completed })
+  );
 }

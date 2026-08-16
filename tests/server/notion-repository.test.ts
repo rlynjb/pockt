@@ -118,6 +118,51 @@ describe("Notion habit repository", () => {
     );
   });
 
+  it("collects paginated completion results", async () => {
+    const client = fakeClient();
+    client.dataSources.query
+      .mockResolvedValueOnce({
+        results: [
+          {
+            id: "completion-1",
+            properties: {
+              Habit: { type: "relation", relation: [{ id: "habit-1" }] },
+              "Completed Date": { type: "date", date: { start: "2026-08-10" } }
+            }
+          }
+        ],
+        has_more: true,
+        next_cursor: "cursor-2"
+      })
+      .mockResolvedValueOnce({
+        results: [
+          {
+            id: "completion-2",
+            properties: {
+              Habit: { type: "relation", relation: [{ id: "habit-2" }] },
+              "Completed Date": { type: "date", date: { start: "2026-08-16" } }
+            }
+          }
+        ],
+        has_more: false,
+        next_cursor: null
+      });
+
+    const repo = createNotionHabitRepositoryForClient(client, {
+      habitsDataSourceId: "habits-db",
+      completionsDataSourceId: "completions-db"
+    });
+
+    await expect(repo.listCompletions("2026-08-10", "2026-08-16")).resolves.toEqual([
+      { id: "completion-1", habitId: "habit-1", completedDate: "2026-08-10" },
+      { id: "completion-2", habitId: "habit-2", completedDate: "2026-08-16" }
+    ]);
+    expect(client.dataSources.query).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ data_source_id: "completions-db", start_cursor: "cursor-2" })
+    );
+  });
+
   it("sets archive by updating Status to Archived", async () => {
     const client = fakeClient();
     client.pages.update.mockResolvedValueOnce({
