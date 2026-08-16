@@ -54,3 +54,163 @@ select:focus-visible {
 .muted {
   color: var(--muted);
 }
+
+.trackerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.trackerHeader h1 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.primaryButton,
+.textButton {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.textButton {
+  border-color: transparent;
+  padding: 4px 0;
+  min-height: 32px;
+  text-align: left;
+}
+
+.gridScroller {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.habitGrid {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.habitGrid th,
+.habitGrid td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  vertical-align: middle;
+}
+
+.habitGrid thead th {
+  background: #fbfaf8;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.habitGrid thead th span,
+.habitGrid thead th strong,
+.habitGrid thead th em {
+  display: block;
+}
+
+.habitGrid thead th em {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.habitColumn,
+.habitName {
+  width: 180px;
+  text-align: left;
+}
+
+.slotRow th {
+  background: #f1f0ed;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.todayColumn {
+  background: var(--accent-soft);
+}
+
+.completionCell {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.completionCell.completed {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.completionCell:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.cellError,
+.bannerError {
+  color: var(--danger);
+}
+
+.cellError {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+}
+
+.emptyState,
+.gridSkeleton {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.gridSkeleton {
+  min-height: 260px;
+  background: linear-gradient(90deg, #f5f4f1, #ffffff, #f5f4f1);
+}
+
+@media (max-width: 640px) {
+  .appShell {
+    padding: 8px;
+  }
+
+  .trackerSurface {
+    padding: 12px;
+  }
+
+  .trackerHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
