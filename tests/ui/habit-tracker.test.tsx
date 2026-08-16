@@ -136,6 +136,42 @@ describe("HabitTracker", () => {
     });
   });
 
+  it("highlights the row that will receive the dragged habit", async () => {
+    const fakeApi = api({
+      loadWeek: vi.fn().mockResolvedValue({
+        weekStart: "2026-08-10",
+        days: [
+          { date: "2026-08-10", weekday: "Mon", dayOfMonth: 10, isToday: false },
+          { date: "2026-08-11", weekday: "Tue", dayOfMonth: 11, isToday: false },
+          { date: "2026-08-12", weekday: "Wed", dayOfMonth: 12, isToday: false },
+          { date: "2026-08-13", weekday: "Thu", dayOfMonth: 13, isToday: false },
+          { date: "2026-08-14", weekday: "Fri", dayOfMonth: 14, isToday: false },
+          { date: "2026-08-15", weekday: "Sat", dayOfMonth: 15, isToday: false },
+          { date: "2026-08-16", weekday: "Sun", dayOfMonth: 16, isToday: true }
+        ],
+        groups: [
+          {
+            slot: "Morning",
+            habits: [
+              { id: "h1", name: "Coffee", slot: "Morning", status: "Active", sortOrder: 1000, completions: {} },
+              { id: "h2", name: "Stretch", slot: "Morning", status: "Active", sortOrder: 2000, completions: {} }
+            ]
+          }
+        ]
+      })
+    });
+    render(<HabitTracker api={fakeApi} initialToday={new Date(2026, 7, 16, 9)} />);
+
+    const dragged = await screen.findByRole("button", { name: "Drag Stretch" });
+    const target = screen.getByRole("button", { name: "Drag Coffee" });
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn(), getData: vi.fn() };
+
+    fireEvent.dragStart(dragged, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+
+    expect(target.closest("tr")).toHaveClass("dropTargetRow");
+  });
+
   it("moves a habit to the end of its slot", async () => {
     const fakeApi = api({
       loadWeek: vi.fn().mockResolvedValue({

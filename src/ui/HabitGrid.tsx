@@ -26,6 +26,11 @@ function longDate(dateOnly: string): string {
 
 export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, onEdit, onReorder, reorderSaving }: Props) {
   const [draggedHabit, setDraggedHabit] = useState<{ slot: Slot; id: string } | null>(null);
+  const [activeDropTarget, setActiveDropTarget] = useState<string | null>(null);
+
+  function endTargetKey(slot: Slot): string {
+    return `${slot}:end`;
+  }
 
   function dropHabit(slot: Slot, habitIds: string[], targetHabitId: string) {
     if (reorderSaving || !draggedHabit || draggedHabit.slot !== slot || draggedHabit.id === targetHabitId) {
@@ -40,6 +45,7 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
     nextIds.splice(targetIndex, 0, draggedHabit.id);
     onReorder(slot, nextIds);
     setDraggedHabit(null);
+    setActiveDropTarget(null);
   }
 
   function dropHabitAtEnd(slot: Slot, habitIds: string[]) {
@@ -54,6 +60,7 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
     nextIds.push(draggedHabit.id);
     onReorder(slot, nextIds);
     setDraggedHabit(null);
+    setActiveDropTarget(null);
   }
 
   return (
@@ -87,7 +94,13 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
                 </th>
               </tr>
               {group.habits.map((habit) => (
-                <tr key={habit.id} className={draggedHabit?.id === habit.id ? "draggingRow" : undefined}>
+                <tr
+                  key={habit.id}
+                  className={[
+                    draggedHabit?.id === habit.id ? "draggingRow" : "",
+                    activeDropTarget === habit.id ? "dropTargetRow" : ""
+                  ].filter(Boolean).join(" ") || undefined}
+                >
                   <th scope="row" className="habitName">
                     <div className="habitNameContent">
                       <button
@@ -105,18 +118,28 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
                           event.dataTransfer.effectAllowed = "move";
                           event.dataTransfer.setData("text/plain", habit.id);
                           setDraggedHabit({ slot: group.slot, id: habit.id });
+                          setActiveDropTarget(null);
                         }}
                         onDragOver={(event) => {
-                          if (draggedHabit?.slot === group.slot) {
+                          if (draggedHabit?.slot === group.slot && draggedHabit.id !== habit.id) {
                             event.preventDefault();
                             event.dataTransfer.dropEffect = "move";
+                            setActiveDropTarget(habit.id);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (activeDropTarget === habit.id) {
+                            setActiveDropTarget(null);
                           }
                         }}
                         onDrop={(event) => {
                           event.preventDefault();
                           dropHabit(group.slot, group.habits.map((row) => row.id), habit.id);
                         }}
-                        onDragEnd={() => setDraggedHabit(null)}
+                        onDragEnd={() => {
+                          setDraggedHabit(null);
+                          setActiveDropTarget(null);
+                        }}
                       >
                         <GripVertical aria-hidden="true" size={14} />
                       </button>
@@ -151,12 +174,18 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
               <tr className="dropEndRow">
                 <td colSpan={days.length + 1}>
                   <div
-                    className="dropEndTarget"
+                    className={activeDropTarget === endTargetKey(group.slot) ? "dropEndTarget dropEndTargetActive" : "dropEndTarget"}
                     aria-label={`Drop at end of ${group.slot}`}
                     onDragOver={(event) => {
                       if (draggedHabit?.slot === group.slot && !reorderSaving) {
                         event.preventDefault();
                         event.dataTransfer.dropEffect = "move";
+                        setActiveDropTarget(endTargetKey(group.slot));
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (activeDropTarget === endTargetKey(group.slot)) {
+                        setActiveDropTarget(null);
                       }
                     }}
                     onDrop={(event) => {
