@@ -91,42 +91,64 @@ function endOfWeekFilter(startDate: string, endDate: string) {
   };
 }
 
+async function queryAllDataSource(
+  client: NotionClientLike,
+  args: Record<string, unknown>
+): Promise<unknown[]> {
+  const results: unknown[] = [];
+  let startCursor: string | null = null;
+
+  do {
+    const response = await client.dataSources.query({
+      ...args,
+      ...(startCursor ? { start_cursor: startCursor } : {})
+    });
+    results.push(...response.results);
+    startCursor = response.has_more ? response.next_cursor ?? null : null;
+  } while (startCursor);
+
+  return results;
+}
+
 export function createNotionHabitRepositoryForClient(
   client: NotionClientLike,
   config: NotionRepositoryConfig
 ): HabitRepository {
-  async function findCompletion(habitId: string, date: string): Promise<Completion | null> {
-    const response = await client.databases.query({
-      database_id: config.completionsDatabaseId,
+  async function findCompletions(habitId: string, date: string): Promise<Completion[]> {
+    const results = await queryAllDataSource(client, {
+      data_source_id: config.completionsDataSourceId,
       filter: {
         and: [
           { property: "Habit", relation: { contains: habitId } },
           { property: "Completed Date", date: { equals: assertDateOnly(date) } }
         ]
-      },
-      page_size: 1
+      }
     });
-    return response.results[0] ? mapCompletion(response.results[0]) : null;
+    return results.map(mapCompletion);
+  }
+
+  async function archiveCompletion(completion: Completion): Promise<void> {
+    await client.pages.update({ page_id: completion.id, archived: true });
   }
 
   return {
     async listActiveHabits() {
-      const response = await client.databases.query({
-        database_id: config.habitsDatabaseId,
+      const results = await queryAllDataSource(client, {
+        data_source_id: config.habitsDataSourceId,
         filter: { property: "Status", select: { equals: "Active" } }
       });
-      return response.results.map(mapHabit);
+      return results.map(mapHabit);
     },
     async listCompletions(startDate, endDate) {
-      const response = await client.databases.query({
-        database_id: config.completionsDatabaseId,
+      const results = await queryAllDataSource(client, {
+        data_source_id: config.completionsDataSourceId,
         filter: endOfWeekFilter(startDate, endDate)
       });
-      return response.results.map(mapCompletion);
+      return results.map(mapCompletion);
     },
     async createHabit(input: CreateHabitInput) {
       const page = await client.pages.create({
-        parent: { database_id: config.habitsDatabaseId },
+        parent: { data_source_id: config.habitsDataSourceId },
         properties: {
           Name: { title: [{ text: { content: normalizeHabitName(input.name) } }] },
           Slot: { select: { name: parseSlot(input.slot) } },
@@ -167,13 +189,14 @@ export function createNotionHabitRepositoryForClient(
       }
     },
     async ensureCompletion(input: SetCompletionInput) {
-      const existing = await findCompletion(input.habitId, input.date);
+      const existing = await findCompletions(input.habitId, input.date);
       if (input.completed) {
-        if (existing) {
-          return existing;
+        if (existing.length > 0) {
+          await Promise.all(existing.slice(1).map(archiveCompletion));
+          return existing[0];
         }
         const page = await client.pages.create({
-          parent: { database_id: config.completionsDatabaseId },
+          parent: { data_source_id: config.completionsDataSourceId },
           properties: {
             Habit: { relation: [{ id: input.habitId }] },
             "Completed Date": { date: { start: assertDateOnly(input.date) } }
@@ -181,9 +204,7 @@ export function createNotionHabitRepositoryForClient(
         });
         return mapCompletion(page);
       }
-      if (existing) {
-        await client.pages.update({ page_id: existing.id, archived: true });
-      }
+      await Promise.all(existing.map(archiveCompletion));
       return null;
     }
   };
@@ -193,7 +214,7 @@ export function createNotionHabitRepository(): HabitRepository {
   const env = getEnv();
   const client = new Client({ auth: env.notionToken }) as unknown as NotionClientLike;
   return createNotionHabitRepositoryForClient(client, {
-    habitsDatabaseId: env.habitsDatabaseId,
-    completionsDatabaseId: env.completionsDatabaseId
+    habitsDataSourceId: env.habitsDataSourceId,
+    completionsDataSourceId: env.completionsDataSourceId
   });
 }

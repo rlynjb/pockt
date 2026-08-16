@@ -42,9 +42,11 @@ function api(overrides: Partial<HabitTrackerApi> = {}): HabitTrackerApi {
 
 describe("HabitTracker", () => {
   it("renders a Monday-Sunday matrix with the current day distinguished", async () => {
-    render(<HabitTracker api={api()} initialToday={new Date(2026, 7, 16, 9)} />);
+    const fakeApi = api();
+    render(<HabitTracker api={fakeApi} initialToday={new Date(2026, 7, 16, 9)} />);
 
     expect(await screen.findByRole("heading", { name: "pockt habits" })).toBeInTheDocument();
+    expect(fakeApi.loadWeek).toHaveBeenCalledWith("2026-08-10", "2026-08-16");
     expect(screen.getByRole("columnheader", { name: /Mon 10/ })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Sun 16 Today/ })).toBeInTheDocument();
     expect(screen.getByText("Morning")).toBeInTheDocument();

@@ -3,8 +3,8 @@ import { ServiceError } from "@/src/server/errors";
 
 const EnvSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
-  NOTION_HABITS_DATABASE_ID: z.string().min(1),
-  NOTION_COMPLETIONS_DATABASE_ID: z.string().min(1)
+  NOTION_HABITS_DATA_SOURCE_ID: z.string().min(1),
+  NOTION_COMPLETIONS_DATA_SOURCE_ID: z.string().min(1)
 });
 
 export function getEnv() {
@@ -15,7 +15,7 @@ export function getEnv() {
 
   return {
     notionToken: result.data.NOTION_TOKEN,
-    habitsDatabaseId: result.data.NOTION_HABITS_DATABASE_ID,
-    completionsDatabaseId: result.data.NOTION_COMPLETIONS_DATABASE_ID
+    habitsDataSourceId: result.data.NOTION_HABITS_DATA_SOURCE_ID,
+    completionsDataSourceId: result.data.NOTION_COMPLETIONS_DATA_SOURCE_ID
   };
 }

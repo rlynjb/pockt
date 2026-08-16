@@ -13,7 +13,7 @@ export type HabitFormValues = {
 };
 
 export type HabitTrackerApi = {
-  loadWeek(startDate: string): Promise<WeekResponse>;
+  loadWeek(startDate: string, todayDate: string): Promise<WeekResponse>;
   setCompletion(habitId: string, date: string, completed: boolean): Promise<void>;
   createHabit(values: HabitFormValues): Promise<Habit>;
   updateHabit(id: string, values: HabitFormValues): Promise<Habit>;

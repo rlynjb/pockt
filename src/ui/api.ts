@@ -9,8 +9,9 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 export const browserHabitApi: HabitTrackerApi = {
-  async loadWeek(startDate: string): Promise<WeekResponse> {
-    return parseJson(await fetch(`/api/habits/week?start=${encodeURIComponent(startDate)}`));
+  async loadWeek(startDate: string, todayDate: string): Promise<WeekResponse> {
+    const params = new URLSearchParams({ start: startDate, today: todayDate });
+    return parseJson(await fetch(`/api/habits/week?${params.toString()}`));
   },
   async setCompletion(habitId: string, date: string, completed: boolean): Promise<void> {
     await parseJson(

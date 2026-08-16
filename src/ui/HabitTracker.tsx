@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { startOfMondayWeek } from "@/src/domain/week";
+import { startOfMondayWeek, toLocalDateString } from "@/src/domain/week";
 import { ArchiveDialog } from "@/src/ui/ArchiveDialog";
 import { browserHabitApi } from "@/src/ui/api";
 import { HabitFormDialog } from "@/src/ui/HabitFormDialog";
@@ -20,8 +20,11 @@ function formatCellDate(date: string): string {
   );
 }
 
-export function HabitTracker({ api = browserHabitApi, initialToday = new Date() }: Props) {
-  const weekStart = useMemo(() => startOfMondayWeek(initialToday), [initialToday]);
+export function HabitTracker({ api = browserHabitApi, initialToday }: Props) {
+  const [clockDate, setClockDate] = useState(() => new Date());
+  const currentDate = initialToday ?? clockDate;
+  const todayDate = useMemo(() => toLocalDateString(currentDate), [currentDate]);
+  const weekStart = useMemo(() => startOfMondayWeek(currentDate), [currentDate]);
   const [week, setWeek] = useState<WeekResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingCells, setPendingCells] = useState<Set<CellKey>>(new Set());
@@ -35,14 +38,14 @@ export function HabitTracker({ api = browserHabitApi, initialToday = new Date() 
   const modalOpen = formMode !== null || archiveOpen;
 
   const loadWeek = useCallback(async () => {
-    const response = await api.loadWeek(weekStart);
+    const response = await api.loadWeek(weekStart, todayDate);
     setWeek(response);
     setLoadError(null);
-  }, [api, weekStart]);
+  }, [api, todayDate, weekStart]);
 
   useEffect(() => {
     let alive = true;
-    api.loadWeek(weekStart)
+    api.loadWeek(weekStart, todayDate)
       .then((response) => {
         if (alive) {
           setWeek(response);
@@ -57,7 +60,21 @@ export function HabitTracker({ api = browserHabitApi, initialToday = new Date() 
     return () => {
       alive = false;
     };
-  }, [api, weekStart]);
+  }, [api, todayDate, weekStart]);
+
+  useEffect(() => {
+    if (initialToday) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setClockDate(new Date());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [initialToday]);
 
   function updateCell(habitId: string, date: string, completed: boolean) {
     setWeek((current) => {

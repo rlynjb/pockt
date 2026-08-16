@@ -23,12 +23,12 @@ Create a Notion database named **Habit Completions** with these properties:
 
 ## Environment Variables
 
-Set these server-side variables in local development and deployment:
+Set these server-side variables in local development and deployment. Use each table's Notion data source ID, not the parent database/page ID.
 
 ```bash
 NOTION_TOKEN=secret_value_from_internal_connection
-NOTION_HABITS_DATABASE_ID=habits_database_id
-NOTION_COMPLETIONS_DATABASE_ID=completions_database_id
+NOTION_HABITS_DATA_SOURCE_ID=habits_data_source_id
+NOTION_COMPLETIONS_DATA_SOURCE_ID=completions_data_source_id
 ```
 
 Do not expose these values to browser code. Do not commit `.env.local`.

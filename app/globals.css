@@ -197,7 +197,7 @@ select:focus-visible {
 
 .gridSkeleton {
   min-height: 260px;
-  background: linear-gradient(90deg, #f5f4f1, #ffffff, #f5f4f1);
+  background: var(--muted-surface);
 }
 
 .secondaryButton,

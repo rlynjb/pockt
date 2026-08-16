@@ -1,6 +1,10 @@
 export type NotionClientLike = {
-  databases: {
-    query(args: Record<string, unknown>): Promise<{ results: unknown[] }>;
+  dataSources: {
+    query(args: Record<string, unknown>): Promise<{
+      results: unknown[];
+      has_more?: boolean;
+      next_cursor?: string | null;
+    }>;
   };
   pages: {
     create(args: Record<string, unknown>): Promise<unknown>;
@@ -10,6 +14,6 @@ export type NotionClientLike = {
 };
 
 export type NotionRepositoryConfig = {
-  habitsDatabaseId: string;
-  completionsDatabaseId: string;
+  habitsDataSourceId: string;
+  completionsDataSourceId: string;
 };

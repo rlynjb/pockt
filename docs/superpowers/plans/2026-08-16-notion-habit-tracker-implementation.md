@@ -643,7 +643,7 @@ git commit -m "feat: add habit domain helpers"
   - `type SetCompletionInput = { habitId: string; date: string; completed: boolean }`
   - `interface HabitRepository`
   - `createNotionHabitRepository(): HabitRepository`
-  - `getEnv(): { notionToken: string; habitsDatabaseId: string; completionsDatabaseId: string }`
+  - `getEnv(): { notionToken: string; habitsDataSourceId: string; completionsDataSourceId: string }`
 
 - [ ] **Step 1: Write failing Notion adapter tests**
 
@@ -663,7 +663,7 @@ function fakeClient() {
 describe("Notion habit repository", () => {
   it("maps active Notion habit pages to domain habits", async () => {
     const client = fakeClient();
-    client.databases.query.mockResolvedValueOnce({
+    client.dataSources.query.mockResolvedValueOnce({
       results: [
         {
           id: "habit-1",
@@ -677,16 +677,16 @@ describe("Notion habit repository", () => {
     });
 
     const repo = createNotionHabitRepositoryForClient(client, {
-      habitsDatabaseId: "habits-db",
-      completionsDatabaseId: "completions-db"
+      habitsDataSourceId: "habits-db",
+      completionsDataSourceId: "completions-db"
     });
 
     await expect(repo.listActiveHabits()).resolves.toEqual([
       { id: "habit-1", name: "Drink water", slot: "Morning", status: "Active" }
     ]);
-    expect(client.databases.query).toHaveBeenCalledWith(
+    expect(client.dataSources.query).toHaveBeenCalledWith(
       expect.objectContaining({
-        database_id: "habits-db",
+        data_source_id: "habits-db",
         filter: { property: "Status", select: { equals: "Active" } }
       })
     );
@@ -703,8 +703,8 @@ describe("Notion habit repository", () => {
       }
     });
     const repo = createNotionHabitRepositoryForClient(client, {
-      habitsDatabaseId: "habits-db",
-      completionsDatabaseId: "completions-db"
+      habitsDataSourceId: "habits-db",
+      completionsDataSourceId: "completions-db"
     });
 
     await expect(repo.createHabit({ name: "Read", slot: "Evening" })).resolves.toEqual({
@@ -714,7 +714,7 @@ describe("Notion habit repository", () => {
       status: "Active"
     });
     expect(client.pages.create).toHaveBeenCalledWith({
-      parent: { database_id: "habits-db" },
+      parent: { data_source_id: "habits-db" },
       properties: {
         Name: { title: [{ text: { content: "Read" } }] },
         Slot: { select: { name: "Evening" } },
@@ -734,8 +734,8 @@ describe("Notion habit repository", () => {
       }
     });
     const repo = createNotionHabitRepositoryForClient(client, {
-      habitsDatabaseId: "habits-db",
-      completionsDatabaseId: "completions-db"
+      habitsDataSourceId: "habits-db",
+      completionsDataSourceId: "completions-db"
     });
 
     await expect(repo.archiveHabit("habit-3")).resolves.toEqual({
@@ -752,7 +752,7 @@ describe("Notion habit repository", () => {
 
   it("creates one completion only when none exists", async () => {
     const client = fakeClient();
-    client.databases.query.mockResolvedValueOnce({ results: [] });
+    client.dataSources.query.mockResolvedValueOnce({ results: [] });
     client.pages.create.mockResolvedValueOnce({
       id: "completion-1",
       properties: {
@@ -761,8 +761,8 @@ describe("Notion habit repository", () => {
       }
     });
     const repo = createNotionHabitRepositoryForClient(client, {
-      habitsDatabaseId: "habits-db",
-      completionsDatabaseId: "completions-db"
+      habitsDataSourceId: "habits-db",
+      completionsDataSourceId: "completions-db"
     });
 
     await expect(repo.ensureCompletion({ habitId: "habit-1", date: "2026-08-16", completed: true })).resolves.toEqual({
@@ -771,7 +771,7 @@ describe("Notion habit repository", () => {
       completedDate: "2026-08-16"
     });
     expect(client.pages.create).toHaveBeenCalledWith({
-      parent: { database_id: "completions-db" },
+      parent: { data_source_id: "completions-db" },
       properties: {
         Habit: { relation: [{ id: "habit-1" }] },
         "Completed Date": { date: { start: "2026-08-16" } }
@@ -858,8 +858,8 @@ import { ServiceError } from "@/src/server/errors";
 
 const EnvSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
-  NOTION_HABITS_DATABASE_ID: z.string().min(1),
-  NOTION_COMPLETIONS_DATABASE_ID: z.string().min(1)
+  NOTION_HABITS_DATA_SOURCE_ID: z.string().min(1),
+  NOTION_COMPLETIONS_DATA_SOURCE_ID: z.string().min(1)
 });
 
 export function getEnv() {
@@ -870,8 +870,8 @@ export function getEnv() {
 
   return {
     notionToken: result.data.NOTION_TOKEN,
-    habitsDatabaseId: result.data.NOTION_HABITS_DATABASE_ID,
-    completionsDatabaseId: result.data.NOTION_COMPLETIONS_DATABASE_ID
+    habitsDataSourceId: result.data.NOTION_HABITS_DATA_SOURCE_ID,
+    completionsDataSourceId: result.data.NOTION_COMPLETIONS_DATA_SOURCE_ID
   };
 }
 ```
@@ -892,8 +892,8 @@ export type NotionClientLike = {
 };
 
 export type NotionRepositoryConfig = {
-  habitsDatabaseId: string;
-  completionsDatabaseId: string;
+  habitsDataSourceId: string;
+  completionsDataSourceId: string;
 };
 ```
 
@@ -943,8 +943,8 @@ export function createNotionHabitRepositoryForClient(
   config: NotionRepositoryConfig
 ): HabitRepository {
   async function findCompletion(habitId: string, date: string): Promise<Completion | null> {
-    const response = await client.databases.query({
-      database_id: config.completionsDatabaseId,
+    const response = await client.dataSources.query({
+      data_source_id: config.completionsDataSourceId,
       filter: {
         and: [
           { property: "Habit", relation: { contains: habitId } },
@@ -958,15 +958,15 @@ export function createNotionHabitRepositoryForClient(
 
   return {
     async listActiveHabits() {
-      const response = await client.databases.query({
-        database_id: config.habitsDatabaseId,
+      const response = await client.dataSources.query({
+        data_source_id: config.habitsDataSourceId,
         filter: { property: "Status", select: { equals: "Active" } }
       });
       return response.results.map(mapHabit);
     },
     async listCompletions(startDate, endDate) {
-      const response = await client.databases.query({
-        database_id: config.completionsDatabaseId,
+      const response = await client.dataSources.query({
+        data_source_id: config.completionsDataSourceId,
         filter: {
           and: [
             { property: "Completed Date", date: { on_or_after: assertDateOnly(startDate) } },
@@ -978,7 +978,7 @@ export function createNotionHabitRepositoryForClient(
     },
     async createHabit(input: CreateHabitInput) {
       const page = await client.pages.create({
-        parent: { database_id: config.habitsDatabaseId },
+        parent: { data_source_id: config.habitsDataSourceId },
         properties: {
           Name: { title: [{ text: { content: normalizeHabitName(input.name) } }] },
           Slot: { select: { name: parseSlot(input.slot) } },
@@ -1009,8 +1009,8 @@ export function createNotionHabitRepositoryForClient(
       return mapHabit(page);
     },
     async getHabit(id: string) {
-      const response = await client.databases.query({
-        database_id: config.habitsDatabaseId,
+      const response = await client.dataSources.query({
+        data_source_id: config.habitsDataSourceId,
         filter: { property: "Name", title: { is_not_empty: true } }
       });
       const page = response.results.find((result: any) => result.id === id);
@@ -1023,7 +1023,7 @@ export function createNotionHabitRepositoryForClient(
           return existing;
         }
         const page = await client.pages.create({
-          parent: { database_id: config.completionsDatabaseId },
+          parent: { data_source_id: config.completionsDataSourceId },
           properties: {
             Habit: { relation: [{ id: input.habitId }] },
             "Completed Date": { date: { start: assertDateOnly(input.date) } }
@@ -1043,8 +1043,8 @@ export function createNotionHabitRepository(): HabitRepository {
   const env = getEnv();
   const client = new Client({ auth: env.notionToken }) as unknown as NotionClientLike;
   return createNotionHabitRepositoryForClient(client, {
-    habitsDatabaseId: env.habitsDatabaseId,
-    completionsDatabaseId: env.completionsDatabaseId
+    habitsDataSourceId: env.habitsDataSourceId,
+    completionsDataSourceId: env.completionsDataSourceId
   });
 }
 ```
@@ -1422,7 +1422,7 @@ git commit -m "feat: add habit API routes"
 - Consumes: `WeekDay`, `SlotGroup`, API response shape from `getWeek`.
 - Produces:
   - `type WeekResponse = Awaited<ReturnType<typeof getWeek>>` mirrored for client use.
-  - `type HabitTrackerApi = { loadWeek(startDate: string): Promise<WeekResponse>; setCompletion(habitId: string, date: string, completed: boolean): Promise<void>; createHabit(...); updateHabit(...); archiveHabit(...); }`
+  - `type HabitTrackerApi = { loadWeek(startDate: string, todayDate: string): Promise<WeekResponse>; setCompletion(habitId: string, date: string, completed: boolean): Promise<void>; createHabit(...); updateHabit(...); archiveHabit(...); }`
   - `HabitTracker({ api?: HabitTrackerApi })`
   - `HabitGrid({ days, groups, pendingCells, failedCells, onToggle })`
 
@@ -1568,7 +1568,7 @@ export type HabitFormValues = {
 };
 
 export type HabitTrackerApi = {
-  loadWeek(startDate: string): Promise<WeekResponse>;
+  loadWeek(startDate: string, todayDate: string): Promise<WeekResponse>;
   setCompletion(habitId: string, date: string, completed: boolean): Promise<void>;
   createHabit(values: HabitFormValues): Promise<Habit>;
   updateHabit(id: string, values: HabitFormValues): Promise<Habit>;
@@ -1594,8 +1594,8 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 export const browserHabitApi: HabitTrackerApi = {
-  async loadWeek(startDate: string): Promise<WeekResponse> {
-    return parseJson(await fetch(`/api/habits/week?start=${encodeURIComponent(startDate)}`));
+  async loadWeek(startDate: string, todayDate: string): Promise<WeekResponse> {
+    return parseJson(await fetch(`/api/habits/week?start=${encodeURIComponent(startDate)}&today=${encodeURIComponent(todayDate)}`));
   },
   async setCompletion(habitId: string, date: string, completed: boolean): Promise<void> {
     await parseJson(
@@ -1752,7 +1752,7 @@ export function HabitTracker({ api = browserHabitApi, initialToday = new Date() 
 
   useEffect(() => {
     let alive = true;
-    api.loadWeek(weekStart)
+    api.loadWeek(weekStart, todayDate)
       .then((response) => {
         if (alive) {
           setWeek(response);
@@ -2324,7 +2324,7 @@ Add handlers:
 
 ```tsx
 async function reloadWeek() {
-  setWeek(await api.loadWeek(weekStart));
+  setWeek(await api.loadWeek(weekStart, todayDate));
 }
 
 async function submitHabit(values: HabitFormValues) {
@@ -2618,8 +2618,8 @@ Set these server-side variables in local development and deployment:
 
 ```bash
 NOTION_TOKEN=secret_value_from_internal_connection
-NOTION_HABITS_DATABASE_ID=habits_database_id
-NOTION_COMPLETIONS_DATABASE_ID=completions_database_id
+NOTION_HABITS_DATA_SOURCE_ID=habits_data_source_id
+NOTION_COMPLETIONS_DATA_SOURCE_ID=completions_data_source_id
 ```
 
 Do not expose these values to browser code. Do not commit `.env.local`.
@@ -2714,7 +2714,7 @@ Expected: matches are allowed only in the spec or docs as non-goals or Phase 2 c
 Run:
 
 ```bash
-rg -n "NOTION_TOKEN|NOTION_HABITS_DATABASE_ID|NOTION_COMPLETIONS_DATABASE_ID|notionToken" app src
+rg -n "NOTION_TOKEN|NOTION_HABITS_DATA_SOURCE_ID|NOTION_COMPLETIONS_DATA_SOURCE_ID|notionToken" app src
 ```
 
 Expected: matches appear only in server-only files under `src/server` and documentation. No `src/ui` file references Notion credentials.
