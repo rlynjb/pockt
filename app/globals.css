@@ -122,6 +122,54 @@ select:focus-visible {
   text-align: left;
 }
 
+.habitNameContent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dragHandle {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: grab;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:hover,
+.dragHandle:focus-visible {
+  background: var(--muted-surface);
+  border-color: var(--border);
+}
+
+.draggingRow {
+  opacity: 0.58;
+}
+
+.dropEndRow td {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.dropEndTarget {
+  height: 8px;
+}
+
+.dropEndTarget:hover {
+  background: var(--accent-soft);
+}
+
 .gridScroller {
   overflow-x: auto;
   border: 1px solid var(--border);

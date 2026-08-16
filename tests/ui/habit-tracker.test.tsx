@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { HabitTracker } from "@/src/ui/HabitTracker";
@@ -36,6 +36,7 @@ function api(overrides: Partial<HabitTrackerApi> = {}): HabitTrackerApi {
     createHabit: vi.fn(),
     updateHabit: vi.fn(),
     archiveHabit: vi.fn(),
+    reorderHabits: vi.fn().mockResolvedValue(undefined),
     ...overrides
   };
 }
@@ -89,6 +90,180 @@ describe("HabitTracker", () => {
       expect(screen.getByRole("button", { name: "Drink water on Tuesday, August 11: incomplete" })).toBeInTheDocument();
     });
     expect(screen.getByText("Could not save Tuesday, August 11 for Drink water.")).toBeInTheDocument();
+  });
+
+  it("reorders habits by dragging within the same slot and persists the new order", async () => {
+    const fakeApi = api({
+      loadWeek: vi.fn().mockResolvedValue({
+        weekStart: "2026-08-10",
+        days: [
+          { date: "2026-08-10", weekday: "Mon", dayOfMonth: 10, isToday: false },
+          { date: "2026-08-11", weekday: "Tue", dayOfMonth: 11, isToday: false },
+          { date: "2026-08-12", weekday: "Wed", dayOfMonth: 12, isToday: false },
+          { date: "2026-08-13", weekday: "Thu", dayOfMonth: 13, isToday: false },
+          { date: "2026-08-14", weekday: "Fri", dayOfMonth: 14, isToday: false },
+          { date: "2026-08-15", weekday: "Sat", dayOfMonth: 15, isToday: false },
+          { date: "2026-08-16", weekday: "Sun", dayOfMonth: 16, isToday: true }
+        ],
+        groups: [
+          {
+            slot: "Morning",
+            habits: [
+              { id: "h1", name: "Coffee", slot: "Morning", status: "Active", sortOrder: 1000, completions: {} },
+              { id: "h2", name: "Stretch", slot: "Morning", status: "Active", sortOrder: 2000, completions: {} },
+              { id: "h3", name: "Plan", slot: "Morning", status: "Active", sortOrder: 3000, completions: {} }
+            ]
+          }
+        ]
+      })
+    });
+    render(<HabitTracker api={fakeApi} initialToday={new Date(2026, 7, 16, 9)} />);
+
+    const dragged = await screen.findByRole("button", { name: "Drag Stretch" });
+    const target = screen.getByRole("button", { name: "Drag Coffee" });
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn(), getData: vi.fn() };
+
+    fireEvent.dragStart(dragged, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    expect(fakeApi.reorderHabits).toHaveBeenCalledWith(["h2", "h1", "h3"]);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Stretch" }).compareDocumentPosition(screen.getByRole("button", { name: "Coffee" })) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+  });
+
+  it("moves a habit to the end of its slot", async () => {
+    const fakeApi = api({
+      loadWeek: vi.fn().mockResolvedValue({
+        weekStart: "2026-08-10",
+        days: [
+          { date: "2026-08-10", weekday: "Mon", dayOfMonth: 10, isToday: false },
+          { date: "2026-08-11", weekday: "Tue", dayOfMonth: 11, isToday: false },
+          { date: "2026-08-12", weekday: "Wed", dayOfMonth: 12, isToday: false },
+          { date: "2026-08-13", weekday: "Thu", dayOfMonth: 13, isToday: false },
+          { date: "2026-08-14", weekday: "Fri", dayOfMonth: 14, isToday: false },
+          { date: "2026-08-15", weekday: "Sat", dayOfMonth: 15, isToday: false },
+          { date: "2026-08-16", weekday: "Sun", dayOfMonth: 16, isToday: true }
+        ],
+        groups: [
+          {
+            slot: "Morning",
+            habits: [
+              { id: "h1", name: "Coffee", slot: "Morning", status: "Active", sortOrder: 1000, completions: {} },
+              { id: "h2", name: "Stretch", slot: "Morning", status: "Active", sortOrder: 2000, completions: {} },
+              { id: "h3", name: "Plan", slot: "Morning", status: "Active", sortOrder: 3000, completions: {} }
+            ]
+          }
+        ]
+      })
+    });
+    render(<HabitTracker api={fakeApi} initialToday={new Date(2026, 7, 16, 9)} />);
+
+    const dragged = await screen.findByRole("button", { name: "Drag Coffee" });
+    const endTarget = screen.getByLabelText("Drop at end of Morning");
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn(), getData: vi.fn() };
+
+    fireEvent.dragStart(dragged, { dataTransfer });
+    fireEvent.dragOver(endTarget, { dataTransfer });
+    fireEvent.drop(endTarget, { dataTransfer });
+
+    expect(fakeApi.reorderHabits).toHaveBeenCalledWith(["h2", "h3", "h1"]);
+  });
+
+  it("rolls back a failed reorder", async () => {
+    const fakeApi = api({
+      reorderHabits: vi.fn().mockRejectedValueOnce(new Error("Notion failed")),
+      loadWeek: vi.fn().mockResolvedValue({
+        weekStart: "2026-08-10",
+        days: [
+          { date: "2026-08-10", weekday: "Mon", dayOfMonth: 10, isToday: false },
+          { date: "2026-08-11", weekday: "Tue", dayOfMonth: 11, isToday: false },
+          { date: "2026-08-12", weekday: "Wed", dayOfMonth: 12, isToday: false },
+          { date: "2026-08-13", weekday: "Thu", dayOfMonth: 13, isToday: false },
+          { date: "2026-08-14", weekday: "Fri", dayOfMonth: 14, isToday: false },
+          { date: "2026-08-15", weekday: "Sat", dayOfMonth: 15, isToday: false },
+          { date: "2026-08-16", weekday: "Sun", dayOfMonth: 16, isToday: true }
+        ],
+        groups: [
+          {
+            slot: "Morning",
+            habits: [
+              { id: "h1", name: "Coffee", slot: "Morning", status: "Active", sortOrder: 1000, completions: {} },
+              { id: "h2", name: "Stretch", slot: "Morning", status: "Active", sortOrder: 2000, completions: {} }
+            ]
+          }
+        ]
+      })
+    });
+    render(<HabitTracker api={fakeApi} initialToday={new Date(2026, 7, 16, 9)} />);
+
+    const dragged = await screen.findByRole("button", { name: "Drag Stretch" });
+    const target = screen.getByRole("button", { name: "Drag Coffee" });
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn(), getData: vi.fn() };
+
+    fireEvent.dragStart(dragged, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    await waitFor(() => expect(screen.getByText("Could not save habit order.")).toBeInTheDocument());
+    expect(
+      screen.getByRole("button", { name: "Coffee" }).compareDocumentPosition(screen.getByRole("button", { name: "Stretch" })) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("does not start another reorder while one is saving", async () => {
+    let finishReorder: () => void = () => undefined;
+    const fakeApi = api({
+      reorderHabits: vi.fn().mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            finishReorder = resolve;
+          })
+      ),
+      loadWeek: vi.fn().mockResolvedValue({
+        weekStart: "2026-08-10",
+        days: [
+          { date: "2026-08-10", weekday: "Mon", dayOfMonth: 10, isToday: false },
+          { date: "2026-08-11", weekday: "Tue", dayOfMonth: 11, isToday: false },
+          { date: "2026-08-12", weekday: "Wed", dayOfMonth: 12, isToday: false },
+          { date: "2026-08-13", weekday: "Thu", dayOfMonth: 13, isToday: false },
+          { date: "2026-08-14", weekday: "Fri", dayOfMonth: 14, isToday: false },
+          { date: "2026-08-15", weekday: "Sat", dayOfMonth: 15, isToday: false },
+          { date: "2026-08-16", weekday: "Sun", dayOfMonth: 16, isToday: true }
+        ],
+        groups: [
+          {
+            slot: "Morning",
+            habits: [
+              { id: "h1", name: "Coffee", slot: "Morning", status: "Active", sortOrder: 1000, completions: {} },
+              { id: "h2", name: "Stretch", slot: "Morning", status: "Active", sortOrder: 2000, completions: {} },
+              { id: "h3", name: "Plan", slot: "Morning", status: "Active", sortOrder: 3000, completions: {} }
+            ]
+          }
+        ]
+      })
+    });
+    render(<HabitTracker api={fakeApi} initialToday={new Date(2026, 7, 16, 9)} />);
+
+    const firstDragged = await screen.findByRole("button", { name: "Drag Stretch" });
+    const firstTarget = screen.getByRole("button", { name: "Drag Coffee" });
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn(), getData: vi.fn() };
+
+    fireEvent.dragStart(firstDragged, { dataTransfer });
+    fireEvent.drop(firstTarget, { dataTransfer });
+
+    await waitFor(() => expect(fakeApi.reorderHabits).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Drag Coffee" })).toBeDisabled();
+
+    fireEvent.dragStart(screen.getByRole("button", { name: "Drag Plan" }), { dataTransfer });
+    fireEvent.drop(screen.getByLabelText("Drop at end of Morning"), { dataTransfer });
+
+    expect(fakeApi.reorderHabits).toHaveBeenCalledTimes(1);
+    finishReorder();
   });
 
   it("shows an empty tracker with Add habit when there are no active habits", async () => {

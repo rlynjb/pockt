@@ -27,4 +27,14 @@ describe("habit domain", () => {
       { slot: "Evening", habits: [{ id: "h2", name: "Read", slot: "Evening", status: "Active", completions: {} }] }
     ]);
   });
+
+  it("orders habits inside a slot by persisted sort order", () => {
+    const groups = groupHabitsBySlot([
+      { id: "h3", name: "Plan day", slot: "Morning", status: "Active", sortOrder: 3000, completions: {} },
+      { id: "h1", name: "Coffee", slot: "Morning", status: "Active", sortOrder: 1000, completions: {} },
+      { id: "h2", name: "Stretch", slot: "Morning", status: "Active", sortOrder: 2000, completions: {} }
+    ]);
+
+    expect(groups[0].habits.map((habit) => habit.id)).toEqual(["h1", "h2", "h3"]);
+  });
 });

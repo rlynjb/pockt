@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Slot } from "@/src/domain/habits";
 import { startOfMondayWeek, toLocalDateString } from "@/src/domain/week";
 import { ArchiveDialog } from "@/src/ui/ArchiveDialog";
 import { browserHabitApi } from "@/src/ui/api";
@@ -34,6 +35,7 @@ export function HabitTracker({ api = browserHabitApi, initialToday }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [reorderSaving, setReorderSaving] = useState(false);
   const selectedHabit = week?.groups.flatMap((group) => group.habits).find((habit) => habit.id === selectedHabitId);
   const modalOpen = formMode !== null || archiveOpen;
 
@@ -91,6 +93,48 @@ export function HabitTracker({ api = browserHabitApi, initialToday }: Props) {
         }))
       };
     });
+  }
+
+  function reorderWeek(current: WeekResponse, slot: Slot, habitIds: string[]): WeekResponse {
+    return {
+      ...current,
+      groups: current.groups.map((group) => {
+        if (group.slot !== slot) {
+          return group;
+        }
+        const habitsById = new Map(group.habits.map((habit) => [habit.id, habit]));
+        const reordered = habitIds.flatMap((habitId) => {
+          const habit = habitsById.get(habitId);
+          return habit ? [{ ...habit }] : [];
+        });
+        const remaining = group.habits.filter((habit) => !habitIds.includes(habit.id));
+        return { ...group, habits: [...reordered, ...remaining] };
+      })
+    };
+  }
+
+  async function handleReorder(slot: Slot, habitIds: string[]) {
+    if (reorderSaving) {
+      return;
+    }
+
+    let previousWeek: WeekResponse | null = null;
+    setLoadError(null);
+    setReorderSaving(true);
+    setWeek((current) => {
+      if (!current) return current;
+      previousWeek = current;
+      return reorderWeek(current, slot, habitIds);
+    });
+
+    try {
+      await api.reorderHabits(habitIds);
+    } catch {
+      setWeek(previousWeek);
+      setLoadError("Could not save habit order.");
+    } finally {
+      setReorderSaving(false);
+    }
   }
 
   async function handleToggle(habitId: string, date: string, completed: boolean) {
@@ -205,6 +249,8 @@ export function HabitTracker({ api = browserHabitApi, initialToday }: Props) {
               setFormError(null);
               setFormMode("edit");
             }}
+            onReorder={handleReorder}
+            reorderSaving={reorderSaving}
           />
         ) : null}
         <HabitFormDialog

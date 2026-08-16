@@ -18,7 +18,8 @@ describe("Notion habit repository", () => {
           properties: {
             Name: { type: "title", title: [{ plain_text: "Drink water" }] },
             Slot: { type: "select", select: { name: "Morning" } },
-            Status: { type: "select", select: { name: "Active" } }
+            Status: { type: "select", select: { name: "Active" } },
+            "Sort Order": { type: "number", number: 1000 }
           }
         }
       ]
@@ -30,12 +31,16 @@ describe("Notion habit repository", () => {
     });
 
     await expect(repo.listActiveHabits()).resolves.toEqual([
-      { id: "habit-1", name: "Drink water", slot: "Morning", status: "Active" }
+      { id: "habit-1", name: "Drink water", slot: "Morning", status: "Active", sortOrder: 1000 }
     ]);
     expect(client.dataSources.query).toHaveBeenCalledWith(
       expect.objectContaining({
         data_source_id: "habits-db",
-        filter: { property: "Status", select: { equals: "Active" } }
+        filter: { property: "Status", select: { equals: "Active" } },
+        sorts: [
+          { property: "Sort Order", direction: "ascending" },
+          { property: "Name", direction: "ascending" }
+        ]
       })
     );
   });
@@ -47,7 +52,8 @@ describe("Notion habit repository", () => {
       properties: {
         Name: { type: "title", title: [{ plain_text: "Read" }] },
         Slot: { type: "select", select: { name: "Evening" } },
-        Status: { type: "select", select: { name: "Active" } }
+        Status: { type: "select", select: { name: "Active" } },
+        "Sort Order": { type: "number", number: 9_999_999 }
       }
     });
     const repo = createNotionHabitRepositoryForClient(client, {
@@ -55,19 +61,43 @@ describe("Notion habit repository", () => {
       completionsDataSourceId: "completions-db"
     });
 
-    await expect(repo.createHabit({ name: "Read", slot: "Evening" })).resolves.toEqual({
+    await expect(repo.createHabit({ name: "Read", slot: "Evening", sortOrder: 9_999_999 })).resolves.toEqual({
       id: "habit-2",
       name: "Read",
       slot: "Evening",
-      status: "Active"
+      status: "Active",
+      sortOrder: 9_999_999
     });
     expect(client.pages.create).toHaveBeenCalledWith({
       parent: { data_source_id: "habits-db" },
       properties: {
         Name: { title: [{ text: { content: "Read" } }] },
         Slot: { select: { name: "Evening" } },
-        Status: { select: { name: "Active" } }
+        Status: { select: { name: "Active" } },
+        "Sort Order": { number: 9_999_999 }
       }
+    });
+  });
+
+  it("persists habit reorder positions to Sort Order", async () => {
+    const client = fakeClient();
+    const repo = createNotionHabitRepositoryForClient(client, {
+      habitsDataSourceId: "habits-db",
+      completionsDataSourceId: "completions-db"
+    });
+
+    await repo.reorderHabits([
+      { id: "habit-2", sortOrder: 1000 },
+      { id: "habit-1", sortOrder: 2000 }
+    ]);
+
+    expect(client.pages.update).toHaveBeenCalledWith({
+      page_id: "habit-2",
+      properties: { "Sort Order": { number: 1000 } }
+    });
+    expect(client.pages.update).toHaveBeenCalledWith({
+      page_id: "habit-1",
+      properties: { "Sort Order": { number: 2000 } }
     });
   });
 
@@ -81,7 +111,8 @@ describe("Notion habit repository", () => {
             properties: {
               Name: { type: "title", title: [{ plain_text: "Drink water" }] },
               Slot: { type: "select", select: { name: "Morning" } },
-              Status: { type: "select", select: { name: "Active" } }
+              Status: { type: "select", select: { name: "Active" } },
+              "Sort Order": { type: "number", number: 1000 }
             }
           }
         ],
@@ -95,7 +126,8 @@ describe("Notion habit repository", () => {
             properties: {
               Name: { type: "title", title: [{ plain_text: "Read" }] },
               Slot: { type: "select", select: { name: "Evening" } },
-              Status: { type: "select", select: { name: "Active" } }
+              Status: { type: "select", select: { name: "Active" } },
+              "Sort Order": { type: "number", number: 2000 }
             }
           }
         ],
@@ -109,8 +141,8 @@ describe("Notion habit repository", () => {
     });
 
     await expect(repo.listActiveHabits()).resolves.toEqual([
-      { id: "habit-1", name: "Drink water", slot: "Morning", status: "Active" },
-      { id: "habit-2", name: "Read", slot: "Evening", status: "Active" }
+      { id: "habit-1", name: "Drink water", slot: "Morning", status: "Active", sortOrder: 1000 },
+      { id: "habit-2", name: "Read", slot: "Evening", status: "Active", sortOrder: 2000 }
     ]);
     expect(client.dataSources.query).toHaveBeenNthCalledWith(
       2,

@@ -11,6 +11,7 @@ Create a Notion database named **Habits** with these properties:
 | `Name` | Title | User-visible habit name |
 | `Slot` | Select | `Morning`, `Midday`, `Evening`, `Anytime` |
 | `Status` | Select | `Active`, `Archived` |
+| `Sort Order` | Number | App-managed row order within a slot |
 
 ## Habit Completions Table
 

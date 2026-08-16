@@ -7,6 +7,7 @@ export type Habit = {
   name: string;
   slot: Slot;
   status: HabitStatus;
+  sortOrder?: number;
 };
 
 export type Completion = {
@@ -43,6 +44,15 @@ export function normalizeHabitName(value: string): string {
 export function groupHabitsBySlot(rows: HabitGridRow[]): SlotGroup[] {
   return SLOTS.map((slot) => ({
     slot,
-    habits: rows.filter((row) => row.slot === slot)
+    habits: rows.filter((row) => row.slot === slot).sort(compareHabitRows)
   })).filter((group) => group.habits.length > 0);
+}
+
+function compareHabitRows(a: HabitGridRow, b: HabitGridRow): number {
+  const aOrder = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
+  const bOrder = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
+  if (aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+  return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 }

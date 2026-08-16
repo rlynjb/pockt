@@ -13,6 +13,7 @@ Phase 1 is a complete active habit-tracking surface. The user can view a Monday-
 - Show one seven-day matrix with habit rows and Monday-Sunday date columns.
 - Clearly distinguish the current day in the grid.
 - Group every active habit row by exactly one time slot: `Morning`, `Midday`, `Evening`, or `Anytime`.
+- Let the user reorder habit rows inside a slot group with drag and drop.
 - Let the user toggle completion for each visible habit/date cell.
 - Support embedded habit management: create habits, edit habit details, and archive habits.
 - Keep Notion as the system of record; the application must not introduce a parallel habit database.
@@ -28,7 +29,7 @@ Phase 1 is a complete active habit-tracking surface. The user can view a Monday-
 - Multiple habit schedules, skipped days, partial completion, notes, or per-day habit applicability.
 - Advanced charts, streak analytics, gamification, meal tracking, journaling, or task management.
 - Archived habit browsing, restore flows, or permanent deletion in the Phase 1 UI.
-- 14-day mode, date-range navigation beyond the current Monday-Sunday week, or manual habit ordering.
+- 14-day mode, date-range navigation beyond the current Monday-Sunday week, or moving habits between slots by drag and drop.
 - Multiple workspaces, user accounts, public OAuth, billing, analytics, Notion Marketplace publication, or public template distribution.
 - Offline-first behavior, push notifications, or native mobile applications.
 
@@ -45,14 +46,16 @@ Each page in the **Habits** table represents one habit.
 | `Name` | Title | User-visible habit name. |
 | `Slot` | Select | Exactly one of `Morning`, `Midday`, `Evening`, or `Anytime`. |
 | `Status` | Select | Exactly one of `Active` or `Archived`. |
+| `Sort Order` | Number | App-managed numeric position for ordering rows within a slot. |
 
 Rules:
 
 - A habit must have exactly one slot. The UI must not allow a habit to be in multiple slots or no slot.
 - Active habits appear in the tracker, grouped by slot.
+- Active habits are ordered within each slot by `Sort Order`, with `Name` as a stable fallback.
 - Archived habits are hidden from active tracking.
 - Deleting a habit in the UI is a soft delete: set `Status` to `Archived`. Do not delete the Notion page.
-- Editing a habit may change only its supported Phase 1 fields: `Name`, `Slot`, and `Status`.
+- Editing a habit may change only its supported Phase 1 fields: `Name`, `Slot`, and `Status`; row reordering updates only `Sort Order`.
 - New habits always use `Status = Active` and repeat daily by default.
 
 ### Habit Completions Table
@@ -111,6 +114,7 @@ The first screen is the working tracker, not a landing page. It contains:
 - A compact header with the product name or page label, the current week range, and an Add habit action.
 - A seven-day grid with columns ordered Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.
 - Habit rows grouped under `Morning`, `Midday`, `Evening`, and `Anytime` section labels.
+- A compact drag handle on each habit row for reordering inside the current slot group.
 - One cell for each active habit on each day of the displayed week.
 - A current-day column treatment that is visibly different from other days.
 
@@ -160,6 +164,16 @@ Future dates are still visible because every active habit repeats daily by defau
 5. The habit disappears from active tracking after the server confirms the Notion write.
 6. Completion pages remain unchanged and related to the archived habit.
 
+### Reorder Habits
+
+1. The user drags a habit row by its row handle and drops it above another habit in the same slot group.
+2. The UI immediately reflects the new order for that slot group.
+3. The browser sends the ordered habit IDs for that slot group to the server.
+4. The server writes deterministic `Sort Order` values to the corresponding Notion habit pages.
+5. If the write fails, the UI restores the prior order and shows an error.
+
+Phase 1 does not support dragging a row into a different slot group. Moving a habit between `Morning`, `Midday`, `Evening`, and `Anytime` remains an edit-form action.
+
 ### Toggle Completion
 
 Checking a cell:
@@ -192,6 +206,7 @@ Repeated taps must be idempotent. Server endpoints should express the desired fi
 | Form validation error | Keep the form open and identify the invalid field. |
 | Toggle saving | Disable only the affected cell and keep its dimensions stable. |
 | Toggle failure | Restore the prior cell state and show retry/error feedback without clearing other cells. |
+| Reorder failure | Restore the prior row order and show an error without changing completions or form state. |
 | Create/update saving | Disable submit controls and preserve entered form values. |
 | Create/update failure | Keep the form open with the user's entered values intact. |
 | Archive confirmation | Trap focus in the confirmation, support Cancel and Confirm, and return to edit on Cancel. |
@@ -203,6 +218,7 @@ Repeated taps must be idempotent. Server endpoints should express the desired fi
 - The current day must not be communicated by color alone; include semantic text or an accessible label.
 - Completed and incomplete states must not rely on color alone; the completed state includes a check mark or equivalent accessible label.
 - Add, edit, archive, cancel, confirm, and retry actions must have visible focus states.
+- Drag handles must have accessible names identifying the habit they move.
 - The add/edit form fields must have labels connected to their controls.
 - Slot selection must enforce a single value and expose the selected slot to assistive technology.
 - Dialogs must move focus into the dialog when opened and return focus to the invoking control when closed.
@@ -218,10 +234,11 @@ The exact framework is open, but the behavior should map to these operations:
 | `GET /api/habits/week?start=YYYY-MM-DD` | Return active habits, Monday-Sunday day metadata, and completion state for the requested local week. |
 | `POST /api/habits` | Create an active habit in Notion with `Name`, exactly one `Slot`, and `Status = Active`. |
 | `PATCH /api/habits/:id` | Update `Name`, `Slot`, or `Status` on the Notion habit page. |
+| `PATCH /api/habits/order` | Persist the provided active habit IDs in their new within-slot order by updating `Sort Order`. |
 | `DELETE /api/habits/:id` | Soft-delete by setting `Status = Archived`. |
 | `PUT /api/completions/:habitId/:date` | Ensure the habit/date completion matches the requested final `completed` boolean. |
 
-All write APIs return the canonical state after the Notion write succeeds. Date parameters are local ISO date-only strings in `YYYY-MM-DD` format.
+Write APIs return canonical state or confirmation only after the Notion write succeeds. Date parameters are local ISO date-only strings in `YYYY-MM-DD` format.
 
 ## Error Handling
 
@@ -231,6 +248,7 @@ All write APIs return the canonical state after the Notion write succeeds. Date 
 | Invalid habit fields | Keep the form open and identify the invalid field. | Validate `Name`, exactly one `Slot`, and allowed `Status`. |
 | Missing Notion permission or bad configuration | Show an unavailable state without sensitive details. | Log a safe diagnostic and return a generic configuration error. |
 | Network/API failure during a write | Restore the prior UI state and offer retry. | Return a clear failure; do not report success without confirmed Notion persistence. |
+| Reorder API failure | Restore the prior row order and show an error. | Report failure unless every requested `Sort Order` update succeeds; a later successful reorder overwrites any partial upstream change. |
 | Duplicate completion race | Keep one completed state. | Query before create and tolerate already-existing completion records. |
 | Archived habit completion attempt | Explain that archived habits cannot be completed. | Reject writes for archived habits. |
 | Archive failure | Keep the habit visible and return to the edit surface with an error. | Leave `Status` unchanged unless Notion confirms the archive write. |
@@ -259,20 +277,22 @@ Before release, verify:
 3. The current day column is visually and accessibly distinguished.
 4. Active habits load from the Notion **Habits** table.
 5. Habits are grouped by exactly one of `Morning`, `Midday`, `Evening`, or `Anytime`.
-6. Each visible active habit has one toggleable cell for each day in the seven-day week.
-7. Completed cells show a clear check state and incomplete cells remain visible.
-8. Toggling a cell creates or removes the completion for that exact habit/date pair.
-9. Repeated toggles and retries are idempotent and do not create duplicate completion pages.
-10. The Add habit action opens a compact form with habit name and exactly one slot.
-11. Creating a habit in the embed creates an active Notion habit page and shows it in the correct slot group.
-12. Editing a habit uses the same compact form and updates only name or slot.
-13. The edit surface includes a separate Archive habit action.
-14. Archive confirmation says the habit will disappear from active tracking but historical check-ins remain.
-15. Canceling archive returns to editing without changing Notion.
-16. Confirming archive sets `Status = Archived`, hides the habit from active tracking, and preserves related completion history.
-17. A failed write restores the previous UI state or keeps the form open with user-entered values intact.
-18. The Notion token is absent from client assets and network responses.
-19. Keyboard and screen-reader interactions satisfy the accessibility requirements in this spec.
+6. Habits within a slot follow Notion `Sort Order`.
+7. Dragging a habit within its slot persists the new order to Notion and survives reload.
+8. Each visible active habit has one toggleable cell for each day in the seven-day week.
+9. Completed cells show a clear check state and incomplete cells remain visible.
+10. Toggling a cell creates or removes the completion for that exact habit/date pair.
+11. Repeated toggles and retries are idempotent and do not create duplicate completion pages.
+12. The Add habit action opens a compact form with habit name and exactly one slot.
+13. Creating a habit in the embed creates an active Notion habit page and shows it in the correct slot group.
+14. Editing a habit uses the same compact form and updates only name or slot.
+15. The edit surface includes a separate Archive habit action.
+16. Archive confirmation says the habit will disappear from active tracking but historical check-ins remain.
+17. Canceling archive returns to editing without changing Notion.
+18. Confirming archive sets `Status = Archived`, hides the habit from active tracking, and preserves related completion history.
+19. A failed write restores the previous UI state or keeps the form open with user-entered values intact.
+20. The Notion token is absent from client assets and network responses.
+21. Keyboard and screen-reader interactions satisfy the accessibility requirements in this spec.
 
 ## Phase 2 Candidates
 
@@ -281,6 +301,5 @@ Before release, verify:
 - User accounts and access control for shared deployments.
 - Custom recurrence rules.
 - Archived habit browsing and restore.
-- Sorting or manual ordering within slots.
 - Weekly, monthly, or streak analytics.
 - Notion Marketplace listing and template packaging.

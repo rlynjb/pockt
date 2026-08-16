@@ -2,7 +2,13 @@ import { Client } from "@notionhq/client";
 import { normalizeHabitName, parseSlot, type Completion, type Habit, type HabitStatus } from "@/src/domain/habits";
 import { assertDateOnly } from "@/src/domain/week";
 import { getEnv } from "@/src/server/env";
-import type { CreateHabitInput, HabitRepository, SetCompletionInput, UpdateHabitInput } from "@/src/server/repository";
+import type {
+  CreateHabitInput,
+  HabitRepository,
+  ReorderHabitInput,
+  SetCompletionInput,
+  UpdateHabitInput
+} from "@/src/server/repository";
 import type { NotionClientLike, NotionRepositoryConfig } from "@/src/server/notion/types";
 
 type RecordValue = Record<string, unknown>;
@@ -59,17 +65,27 @@ function dateStart(page: unknown, property: string): string | null {
   return value.date.start;
 }
 
+function numberValue(page: unknown, property: string): number | null {
+  const value = getProperties(page)[property];
+  if (!isRecord(value) || typeof value.number !== "number") {
+    return null;
+  }
+  return value.number;
+}
+
 function mapHabit(page: unknown): Habit {
   const status = selectName(page, "Status");
   if (status !== "Active" && status !== "Archived") {
     throw new Error("Unexpected Notion habit status");
   }
+  const sortOrder = numberValue(page, "Sort Order");
 
   return {
     id: getPageId(page),
     name: normalizeHabitName(titleText(page, "Name")),
     slot: parseSlot(selectName(page, "Slot")),
-    status: status as HabitStatus
+    status: status as HabitStatus,
+    ...(sortOrder === null ? {} : { sortOrder })
   };
 }
 
@@ -135,7 +151,11 @@ export function createNotionHabitRepositoryForClient(
     async listActiveHabits() {
       const results = await queryAllDataSource(client, {
         data_source_id: config.habitsDataSourceId,
-        filter: { property: "Status", select: { equals: "Active" } }
+        filter: { property: "Status", select: { equals: "Active" } },
+        sorts: [
+          { property: "Sort Order", direction: "ascending" },
+          { property: "Name", direction: "ascending" }
+        ]
       });
       return results.map(mapHabit);
     },
@@ -152,7 +172,8 @@ export function createNotionHabitRepositoryForClient(
         properties: {
           Name: { title: [{ text: { content: normalizeHabitName(input.name) } }] },
           Slot: { select: { name: parseSlot(input.slot) } },
-          Status: { select: { name: "Active" } }
+          Status: { select: { name: "Active" } },
+          "Sort Order": { number: input.sortOrder ?? Date.now() }
         }
       });
       return mapHabit(page);
@@ -167,6 +188,9 @@ export function createNotionHabitRepositoryForClient(
       }
       if (input.status !== undefined) {
         properties.Status = { select: { name: input.status } };
+      }
+      if (input.sortOrder !== undefined) {
+        properties["Sort Order"] = { number: input.sortOrder };
       }
       const page = await client.pages.update({ page_id: id, properties });
       return mapHabit(page);
@@ -206,6 +230,16 @@ export function createNotionHabitRepositoryForClient(
       }
       await Promise.all(existing.map(archiveCompletion));
       return null;
+    },
+    async reorderHabits(input: ReorderHabitInput[]) {
+      await Promise.all(
+        input.map((habit) =>
+          client.pages.update({
+            page_id: habit.id,
+            properties: { "Sort Order": { number: habit.sortOrder } }
+          })
+        )
+      );
     }
   };
 }

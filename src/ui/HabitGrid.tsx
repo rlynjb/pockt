@@ -1,5 +1,6 @@
-import { Fragment } from "react";
-import type { SlotGroup } from "@/src/domain/habits";
+import { GripVertical } from "lucide-react";
+import { Fragment, useState } from "react";
+import type { Slot, SlotGroup } from "@/src/domain/habits";
 import type { WeekDay } from "@/src/domain/week";
 import type { CellKey } from "@/src/ui/types";
 
@@ -10,6 +11,8 @@ type Props = {
   failedCells: Map<CellKey, string>;
   onToggle(habitId: string, date: string, completed: boolean): void;
   onEdit(habitId: string): void;
+  onReorder(slot: Slot, habitIds: string[]): void;
+  reorderSaving: boolean;
 };
 
 function longDate(dateOnly: string): string {
@@ -21,7 +24,38 @@ function longDate(dateOnly: string): string {
   }).format(new Date(year, month - 1, day));
 }
 
-export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, onEdit }: Props) {
+export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, onEdit, onReorder, reorderSaving }: Props) {
+  const [draggedHabit, setDraggedHabit] = useState<{ slot: Slot; id: string } | null>(null);
+
+  function dropHabit(slot: Slot, habitIds: string[], targetHabitId: string) {
+    if (reorderSaving || !draggedHabit || draggedHabit.slot !== slot || draggedHabit.id === targetHabitId) {
+      return;
+    }
+
+    const nextIds = habitIds.filter((id) => id !== draggedHabit.id);
+    const targetIndex = nextIds.indexOf(targetHabitId);
+    if (targetIndex === -1) {
+      return;
+    }
+    nextIds.splice(targetIndex, 0, draggedHabit.id);
+    onReorder(slot, nextIds);
+    setDraggedHabit(null);
+  }
+
+  function dropHabitAtEnd(slot: Slot, habitIds: string[]) {
+    if (reorderSaving || !draggedHabit || draggedHabit.slot !== slot) {
+      return;
+    }
+
+    const nextIds = habitIds.filter((id) => id !== draggedHabit.id);
+    if (nextIds.at(-1) === draggedHabit.id) {
+      return;
+    }
+    nextIds.push(draggedHabit.id);
+    onReorder(slot, nextIds);
+    setDraggedHabit(null);
+  }
+
   return (
     <div className="gridScroller">
       <table className="habitGrid">
@@ -53,11 +87,43 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
                 </th>
               </tr>
               {group.habits.map((habit) => (
-                <tr key={habit.id}>
+                <tr key={habit.id} className={draggedHabit?.id === habit.id ? "draggingRow" : undefined}>
                   <th scope="row" className="habitName">
-                    <button type="button" className="textButton" onClick={() => onEdit(habit.id)}>
-                      {habit.name}
-                    </button>
+                    <div className="habitNameContent">
+                      <button
+                        type="button"
+                        className="dragHandle"
+                        draggable
+                        disabled={reorderSaving}
+                        aria-label={`Drag ${habit.name}`}
+                        title={`Drag ${habit.name}`}
+                        onDragStart={(event) => {
+                          if (reorderSaving) {
+                            event.preventDefault();
+                            return;
+                          }
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", habit.id);
+                          setDraggedHabit({ slot: group.slot, id: habit.id });
+                        }}
+                        onDragOver={(event) => {
+                          if (draggedHabit?.slot === group.slot) {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          dropHabit(group.slot, group.habits.map((row) => row.id), habit.id);
+                        }}
+                        onDragEnd={() => setDraggedHabit(null)}
+                      >
+                        <GripVertical aria-hidden="true" size={14} />
+                      </button>
+                      <button type="button" className="textButton" onClick={() => onEdit(habit.id)}>
+                        {habit.name}
+                      </button>
+                    </div>
                   </th>
                   {days.map((day) => {
                     const key: CellKey = `${habit.id}:${day.date}`;
@@ -82,6 +148,24 @@ export function HabitGrid({ days, groups, pendingCells, failedCells, onToggle, o
                   })}
                 </tr>
               ))}
+              <tr className="dropEndRow">
+                <td colSpan={days.length + 1}>
+                  <div
+                    className="dropEndTarget"
+                    aria-label={`Drop at end of ${group.slot}`}
+                    onDragOver={(event) => {
+                      if (draggedHabit?.slot === group.slot && !reorderSaving) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                      }
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      dropHabitAtEnd(group.slot, group.habits.map((row) => row.id));
+                    }}
+                  />
+                </td>
+              </tr>
             </Fragment>
           ))}
         </tbody>

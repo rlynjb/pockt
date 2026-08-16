@@ -46,6 +46,15 @@ export const browserHabitApi: HabitTrackerApi = {
         method: "DELETE"
       })
     );
+  },
+  async reorderHabits(habitIds: string[]) {
+    await parseJson(
+      await fetch("/api/habits/order", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ habitIds })
+      })
+    );
   }
 };
 

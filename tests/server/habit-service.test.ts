@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { archiveHabit, createHabit, getWeek, setCompletion, updateHabit } from "@/src/server/habit-service";
+import { archiveHabit, createHabit, getWeek, reorderHabits, setCompletion, updateHabit } from "@/src/server/habit-service";
 import type { HabitRepository } from "@/src/server/repository";
 
 function repo(overrides: Partial<HabitRepository> = {}): HabitRepository {
@@ -11,6 +11,7 @@ function repo(overrides: Partial<HabitRepository> = {}): HabitRepository {
     archiveHabit: vi.fn(),
     getHabit: vi.fn(),
     ensureCompletion: vi.fn(),
+    reorderHabits: vi.fn(),
     ...overrides
   };
 }
@@ -80,6 +81,43 @@ describe("habit service", () => {
     });
     await updateHabit(fake, "h1", { name: "Read", slot: "Evening" });
     expect(fake.updateHabit).toHaveBeenCalledWith("h1", { name: "Read", slot: "Evening" });
+  });
+
+  it("persists a reordered habit list with stable sort positions", async () => {
+    const fake = repo({
+      listActiveHabits: vi.fn().mockResolvedValue([
+        { id: "h1", name: "Coffee", slot: "Morning", status: "Active" },
+        { id: "h2", name: "Stretch", slot: "Morning", status: "Active" },
+        { id: "h3", name: "Plan", slot: "Morning", status: "Active" }
+      ])
+    });
+
+    await reorderHabits(fake, { habitIds: ["h2", "h1", "h3"] });
+
+    expect(fake.reorderHabits).toHaveBeenCalledWith([
+      { id: "h2", sortOrder: 1000 },
+      { id: "h1", sortOrder: 2000 },
+      { id: "h3", sortOrder: 3000 }
+    ]);
+  });
+
+  it("rejects an empty habit reorder", async () => {
+    await expect(reorderHabits(repo(), { habitIds: [] })).rejects.toThrow("Habit order must include at least one habit");
+  });
+
+  it("rejects reorder IDs that are not all active habits in one slot", async () => {
+    const fake = repo({
+      listActiveHabits: vi.fn().mockResolvedValue([
+        { id: "h1", name: "Coffee", slot: "Morning", status: "Active" },
+        { id: "h2", name: "Stretch", slot: "Morning", status: "Active" },
+        { id: "h4", name: "Plan", slot: "Morning", status: "Active" },
+        { id: "h3", name: "Read", slot: "Evening", status: "Active" }
+      ])
+    });
+
+    await expect(reorderHabits(fake, { habitIds: ["h1", "h3"] })).rejects.toThrow("Habit order must stay within one slot");
+    await expect(reorderHabits(fake, { habitIds: ["h1", "h999"] })).rejects.toThrow("Habit order can include only active habits");
+    await expect(reorderHabits(fake, { habitIds: ["h2", "h1"] })).rejects.toThrow("Habit order must include every active habit in the slot");
   });
 
   it("archives through Status without deleting history", async () => {

@@ -18,6 +18,7 @@ export type HabitTrackerApi = {
   createHabit(values: HabitFormValues): Promise<Habit>;
   updateHabit(id: string, values: HabitFormValues): Promise<Habit>;
   archiveHabit(id: string): Promise<Habit>;
+  reorderHabits(habitIds: string[]): Promise<void>;
 };
 
 export type CellKey = `${string}:${string}`;
