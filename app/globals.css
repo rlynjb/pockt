@@ -173,7 +173,8 @@ select:focus-visible {
 
 .gridScroller {
   overflow-x: auto;
-  border: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   border-radius: 0;
 }
 

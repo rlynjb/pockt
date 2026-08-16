@@ -55,12 +55,21 @@ test("renders the approved tracker and management flows", async ({ page }) => {
     if (!(scroller instanceof HTMLElement) || !(table instanceof HTMLElement)) {
       throw new Error("Habit grid did not render");
     }
+    const scrollerStyles = window.getComputedStyle(scroller);
     return {
       scrollerWidth: scroller.getBoundingClientRect().width,
-      tableWidth: table.getBoundingClientRect().width
+      tableWidth: table.getBoundingClientRect().width,
+      borderTopWidth: scrollerStyles.borderTopWidth,
+      borderRightWidth: scrollerStyles.borderRightWidth,
+      borderBottomWidth: scrollerStyles.borderBottomWidth,
+      borderLeftWidth: scrollerStyles.borderLeftWidth
     };
   });
   expect(gridMetrics.tableWidth).toBeLessThanOrEqual(gridMetrics.scrollerWidth + 1);
+  expect(gridMetrics.borderTopWidth).not.toBe("0px");
+  expect(gridMetrics.borderBottomWidth).not.toBe("0px");
+  expect(gridMetrics.borderLeftWidth).toBe("0px");
+  expect(gridMetrics.borderRightWidth).toBe("0px");
 
   await page.getByRole("button", { name: "Add habit" }).click();
   const addDialog = page.getByRole("dialog", { name: "Add habit" });
