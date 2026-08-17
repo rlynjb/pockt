@@ -32,4 +32,20 @@ NOTION_HABITS_DATA_SOURCE_ID=habits_data_source_id
 NOTION_COMPLETIONS_DATA_SOURCE_ID=completions_data_source_id
 ```
 
-Do not expose these values to browser code. Do not commit `.env.local`.
+Do not expose these values to browser code. Do not commit `.env` or `.env.local`.
+
+## Fly Deployment
+
+The Fly app is configured in `fly.toml` as `pockt`. For repeatable deployment, keep the three variables above in a root `.env` file, install and authenticate the Fly CLI, then run:
+
+```bash
+npm run deploy:fly
+```
+
+The helper stages only `NOTION_TOKEN`, `NOTION_HABITS_DATA_SOURCE_ID`, and `NOTION_COMPLETIONS_DATA_SOURCE_ID` with `fly secrets set --stage`, then runs `fly deploy` from the repository root.
+
+After deployment succeeds, embed the stable Fly URL in Notion:
+
+1. Open the Notion page where the tracker should live.
+2. Add an `/embed` block.
+3. Use `https://pockt.fly.dev`.
